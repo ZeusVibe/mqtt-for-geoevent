@@ -2,7 +2,7 @@ GEOVIBE REFACTORING
 =======================
 
 CHANGES TO THE MqttClientManager
-
+=======================
 1) to method connect(MqttCallback callback) added follow:
    MqttConnectOptions connOpts = new MqttConnectOptions();
    connOpts.setKeepAliveInterval(3600); // 1 hour
@@ -40,7 +40,7 @@ and ensureIsConnected(MqttCallback callback) method refactoring:
 
 
 CHANGES TO THE MqttTransportBase
-
+=======================
 1) to the connectionLost(Throwable cause) method, we add the fault accounting logic:
  @Override
   public void connectionLost(Throwable cause)
@@ -60,6 +60,7 @@ CHANGES TO THE MqttTransportBase
 
 4) remove setErrorState() from start() or run()
 
+=======================
 Using logic from IotHubMqttMessageBase
 
 The run() code from IotHubMqttMessageBase can be adapted for status monitoring.:
