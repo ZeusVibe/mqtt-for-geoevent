@@ -156,6 +156,7 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
   public void connectionLost(Throwable cause)
   {
     LOGGER.debug("CONNECTION_LOST", cause, cause.getLocalizedMessage());
+    LOGGER.warn("MQTT connection lost: {}", cause.getMessage());
   }
 
   @Override
