@@ -109,10 +109,15 @@ private static final int RECONNECT_DELAY_MS = 60000; // the delay between attemp
         Thread.sleep(RECONNECT_DELAY_MS); // pause before reconnecting
         connect(callback);
         reconnectAttempts = 0; // Resetting the counter on success 
+        LOGGER.info("MQTT reconnected successfully.");
         // DELETED reconnectAttempts++;
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted during reconnect attempt", e);
-      }
+      } catch (MqttException e) {
+      reconnectAttempts++;
+      LOGGER.warn("Reconnect failed (attempt #{0}). Will retry.", reconnectAttempts, e);
+      // продолжаем попытки — фоновый монитор вызовет снова
+    }
     }
   }
 
