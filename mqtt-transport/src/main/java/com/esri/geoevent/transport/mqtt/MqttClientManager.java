@@ -61,6 +61,14 @@ public class MqttClientManager
 
     mqttClient = createMqttClient(callback);
     mqttClient.connect(config.getConnectOptions());
+
+    // NEW !!!
+    MqttConnectOptions connOpts = new MqttConnectOptions();
+    connOpts.setKeepAliveInterval(3600); // 1 hour is critical for long interruptions.
+    connOpts.setConnectionTimeout(180);  // 3 minutes to establish a connection
+    connOpts.setAutomaticReconnect(true);
+    connOpts.setServerURIs(Arrays.asList(config.getUrl())); // saving the URI from the config
+
   }
 
   public boolean isConnected()
@@ -89,6 +97,24 @@ public class MqttClientManager
     }
   }
 
+private int reconnectAttempts = 0;
+private static final int MAX_RECONNECT_ATTEMPTS = 0; // 0 = infinite reconnection
+private static final int RECONNECT_DELAY_MS = 60000; // the delay between attempts is 1 minute
+
+  // REDEFINED THE METHOD AND LOOK 3 STINGS ABOVE
+  public void ensureIsConnected(MqttCallback callback) throws MqttException {
+    if (!isConnected() && (MAX_RECONNECT_ATTEMPTS == 0 || reconnectAttempts < MAX_RECONNECT_ATTEMPTS)) {
+      disconnect();
+      try {
+        Thread.sleep(RECONNECT_DELAY_MS); // pause before reconnecting
+        connect(callback);
+        reconnectAttempts++;
+      } catch (InterruptedException e) {
+        LOGGER.error("Interrupted during reconnect attempt", e);
+      }
+    }
+  }
+/*    OLD !!!
   public void ensureIsConnected(MqttCallback callback) throws MqttException
   {
     if (!isConnected())
@@ -97,7 +123,7 @@ public class MqttClientManager
       connect(callback);
     }
   }
-
+*/
   public void publish(byte[] bytes, GeoEvent geoEvent) throws Exception
   {
     String topicToPublish = config.getTopic();
