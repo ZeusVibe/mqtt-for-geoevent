@@ -1,3 +1,75 @@
+GEOVIBE REFACTORING
+=======================
+
+CHANGES TO THE MqttClientManager
+
+1) to method connect(MqttCallback callback) added follow:
+   MqttConnectOptions connOpts = new MqttConnectOptions();
+   connOpts.setKeepAliveInterval(3600); // 1 hour
+   connOpts.setConnectionTimeout(180);  // 3 minutes
+   connOpts.setAutomaticReconnect(true);  // auto-reconnect
+   connOpts.setCleanSession(false);     // saving the session
+   connOpts.setUserName(config.getUserName());
+   connOpts.setPassword(config.getPassword().toCharArray());
+
+
+2) then:
+   private int reconnectAttempts = 0;
+   private static final int MAX_RECONNECT_ATTEMPTS = 0; // 0 = infinite reconnection
+   private static final int RECONNECT_DELAY_MS = 60000; // the delay between attempts is 1 minute
+
+and ensureIsConnected(MqttCallback callback) method refactoring:
+    public void ensureIsConnected(MqttCallback callback) throws MqttException {
+       if (!isConnected() {  //DELETED if (!isConnected() && (MAX_RECONNECT_ATTEMPTS == 0 || reconnectAttempts < MAX_RECONNECT_ATTEMPTS))
+         disconnect();
+         try {
+           Thread.sleep(RECONNECT_DELAY_MS); // pause before reconnecting
+           connect(callback);
+           reconnectAttempts = 0; // Resetting the counter on success 
+           LOGGER.info("MQTT reconnected successfully.");
+           // DELETED reconnectAttempts++;
+         } catch (InterruptedException e) {
+           LOGGER.error("Interrupted during reconnect attempt", e);
+         } catch (MqttException e) {
+         reconnectAttempts++;
+         LOGGER.warn("Reconnect failed (attempt #{0}). Will retry.", reconnectAttempts, e);
+         // продолжаем попытки — фоновый монитор вызовет снова
+       }
+       }
+     }
+
+
+CHANGES TO THE MqttTransportBase
+
+1) to the connectionLost(Throwable cause) method, we add the fault accounting logic:
+ @Override
+  public void connectionLost(Throwable cause)
+  {
+    LOGGER.debug("CONNECTION_LOST", cause, cause.getLocalizedMessage());
+    LOGGER.warn("MQTT connection lost: {}", cause.getMessage());
+    LOGGER.warn("MQTT connection lost: {}. Reconnect will be attempted by monitor.", cause.getMessage());
+  }
+
+2) Added configuration parameters to MqttTransportBase
+   private static final long MONITOR_INTERVAL_MS = 60000; // Проверка каждые 60 секунд
+   private volatile boolean isMonitoring = false;
+   private Thread monitorThread;
+
+
+3) added startConnectionMonitor method for BACKGROUND MONITORING and apply in run() and stop() methods
+
+4) remove setErrorState() from start() or run()
+
+Using logic from IotHubMqttMessageBase
+
+The run() code from IotHubMqttMessageBase can be adapted for status monitoring.:
+
+Run a separate thread that checks MqttClient.isConnected() every 5-10 minutes.
+When disconnected, run ensureIsConnected().
+If disconnected for a long time (>1 hour), log a warning, but do not stop the service.
+
+
+=======================
 # mqtt-for-geoevent
 
 ArcGIS GeoEvent Server sample MQTT inbound and outbound transports for sending and receiving messages in the MQTT format.
