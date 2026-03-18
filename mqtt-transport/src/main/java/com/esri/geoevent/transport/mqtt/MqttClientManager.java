@@ -103,12 +103,12 @@ private static final int RECONNECT_DELAY_MS = 60000; // the delay between attemp
 
   // REDEFINED THE METHOD AND LOOK 3 STINGS ABOVE
   public void ensureIsConnected(MqttCallback callback) throws MqttException {
-    if (!isConnected() && (MAX_RECONNECT_ATTEMPTS == 0 || reconnectAttempts < MAX_RECONNECT_ATTEMPTS)) {
+    if (!isConnected() {  //if (!isConnected() && (MAX_RECONNECT_ATTEMPTS == 0 || reconnectAttempts < MAX_RECONNECT_ATTEMPTS))
       disconnect();
       try {
         Thread.sleep(RECONNECT_DELAY_MS); // pause before reconnecting
         connect(callback);
-        reconnectAttempts++;
+        // reconnectAttempts++;
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted during reconnect attempt", e);
       }
