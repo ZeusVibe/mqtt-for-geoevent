@@ -117,6 +117,10 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
           setErrorMessage("");
           setRunningState(RunningState.STARTED);
           LOGGER.trace(getName() + " has started successfully. Transport state is set to STARTED.");
+
+          sMonitoring = true;
+          startConnectionMonitor();
+          
         } catch (Throwable error) {
           String errorMsg = LOGGER.translate("UNEXPECTED_ERROR", error.getMessage());
           setErrorState(errorMsg, error);
@@ -138,6 +142,10 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
       case ERROR:
         setRunningState(RunningState.STOPPING);
         LOGGER.trace("Stopping " + getName() + "...");
+        isMonitoring = false;
+        if (monitorThread != null) {
+          monitorThread.interrupt();
+        }
         stopTransport();
         setErrorMessage("");
         setRunningState(RunningState.STOPPED);
@@ -157,6 +165,7 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
   {
     LOGGER.debug("CONNECTION_LOST", cause, cause.getLocalizedMessage());
     LOGGER.warn("MQTT connection lost: {}", cause.getMessage());
+    LOGGER.warn("MQTT connection lost: {}. Reconnect will be attempted by monitor.", cause.getMessage());
   }
 
   @Override
@@ -371,4 +380,28 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
     // return null when either property value is invalid, or null
     return null;
   }
+}
+
+// BACKGROUND MONITORING
+private void startConnectionMonitor() {
+  monitorThread = new Thread(() -> {
+    while (isMonitoring) {
+      try {
+        Thread.sleep(MONITOR_INTERVAL_MS);
+        if (mqttClientManager != null && !mqttClientManager.isConnected()) {
+          LOGGER.warn("MQTT connection lost. Attempting reconnect...");
+          try {
+            mqttClientManager.ensureIsConnected(this);
+          } catch (MqttException e) {
+            LOGGER.error("Reconnect failed", e);
+          }
+        }
+      } catch (InterruptedException e) {
+        LOGGER.info("Connection monitor interrupted");
+        Thread.currentThread().interrupt();
+      }
+    }
+  });
+  monitorThread.setDaemon(true);
+  monitorThread.start();
 }
