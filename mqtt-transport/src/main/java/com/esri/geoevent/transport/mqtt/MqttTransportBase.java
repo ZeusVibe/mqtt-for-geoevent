@@ -22,6 +22,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public abstract class MqttTransportBase extends TransportBase implements MqttCallback, Runnable
+
+private volatile boolean isMonitoring = false;
+private Thread monitorThread;
+private static final long MONITOR_INTERVAL_MS = 60000; // 60 с
+private static final int RECONNECT_DELAY_MS = 60000;     // 60 с
+
 {
   protected static final BundleLogger LOGGER = BundleLoggerFactory.getLogger(MqttTransportBase.class.getName(), "com.esri.geoevent.transport.mqtt-transport");
   private MqttTransportConfig config;
