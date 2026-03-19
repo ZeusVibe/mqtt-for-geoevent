@@ -141,29 +141,34 @@ private static final int RECONNECT_DELAY_MS = 60000;     // 60 с
   }
 
   @Override
-  public synchronized void stop()
-  {
-    switch (getRunningState()) {
-      case STOPPED:
-      case STOPPING:
-        break;
-      case STARTED:
-      case STARTING:
-      case ERROR:
-        setRunningState(RunningState.STOPPING);
-        LOGGER.trace("Stopping " + getName() + "...");
-        isMonitoring = false;
-        if (monitorThread != null) {
-          monitorThread.interrupt();
+  public synchronized void stop() {
+    // 1. We change the flag so that the cycle in the monitor understands that it's time to end.
+    isMonitoring = false;
+
+    // 2. Interrupting the monitoring thread if it is sleeping in Thread.sleep()
+    if (monitorThread != null && monitorThread.isAlive()) {
+        LOGGER.info("Stopping MQTT connection monitor thread...");
+        monitorThread.interrupt(); 
+        try {
+            // We wait a maximum of 2 seconds for the stream to finish correctly.
+            monitorThread.join(2000); 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
-        stopTransport();
-        setErrorMessage("");
-        setRunningState(RunningState.STOPPED);
-        LOGGER.trace(getName() + " has stopped. Transport state is set to STOPPED.");
-        break;
-      default:
-        LOGGER.trace("Cannot stop " + getName() + ": transport is unavailable.");
     }
+
+    // 3. We stop the MQTT client itself through the manager
+    if (mqttClientManager != null) {
+        try {
+            mqttClientManager.disconnect();
+        } catch (Exception e) {
+            LOGGER.error("Error during MQTT disconnect: " + e.getMessage());
+        }
+    }
+
+    // 4. We make sure to call super.stop() so that GeoEvent marks the transport as stopped.
+    super.stop();
+    LOGGER.info("MQTT Transport stopped successfully.");
   }
 
   protected void publish(byte[] bytes, GeoEvent geoEvent) throws Exception {
