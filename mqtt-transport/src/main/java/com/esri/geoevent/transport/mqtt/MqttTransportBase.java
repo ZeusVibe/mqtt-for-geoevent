@@ -128,7 +128,7 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
           setRunningState(RunningState.STARTED);
           LOGGER.trace(getName() + " has started successfully. Transport state is set to STARTED.");
 
-          sMonitoring = true;
+          isMonitoring = true;
           startConnectionMonitor();
           
         } catch (Throwable error) {
