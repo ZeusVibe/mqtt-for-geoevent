@@ -35,6 +35,12 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+
+
+
 /**
  * Manages the MQTT properties, creating clients, connecting clients, and disconnecting clients.
  */
@@ -55,35 +61,35 @@ public class MqttClientManager
       LOGGER.trace(this.toString());
   }
 
-  public void connect(MqttCallback callback) throws MqttException {
+public void connect(MqttCallback callback) throws MqttException {
+    // 1. Double-start protection
     if (isConnected() || isConnecting.get()) return;
 
     try {
         isConnecting.set(true);
         
-        // 1. Creating a client
+        // 2. Logging from the original (preserving authenticity)
+        if (config.isUseCredentials()) {
+            LOGGER.trace("Connecting to MQTT Broker using credentials. Username={0}", config.getUserName());
+        }
+        if (config.isUseSSL()) {
+            LOGGER.trace("Connecting to MQTT Broker using SSL. NOTE: Only TLS 1.0 to 1.2 are supported.");
+        }
+
+        // 3. Creating a client
         mqttClient = createMqttClient(callback);
 
-        // 2. We configure the options (We take the basic ones from the config and add our own)
-        MqttConnectOptions connOpts = new MqttConnectOptions();
+        // 4. THE MAIN POINT: We take READY-made options from the config
+        MqttConnectOptions connOpts = config.getConnectOptions();
         
-        // Your settings for the "survival" of the service after network lags
+        // 5. We ONLY modify what is responsible for stability.
         connOpts.setKeepAliveInterval(3600); 
         connOpts.setConnectionTimeout(180);
         connOpts.setAutomaticReconnect(true);
-        connOpts.setCleanSession(false); // CRITICAL for saving subscriptions
-        
-        // Data from the GeoEvent config
-        connOpts.setUserName(config.getUserName());
-        connOpts.setPassword(config.getPassword().toCharArray());
-        connOpts.setServerURIs(new String[] { config.getUrl() });
+        connOpts.setCleanSession(false); 
 
-        if (config.isUseSSL()) {
-          LOGGER.trace("Connecting to MQTT Broker using SSL. NOTE: Only TLS 1.0 to 1.2 are supported.");
-        }
-
-        // 3. Passing the configured options to the connect method
-        mqttClient.connect(connOpts); 
+        // 6. Connecting with a ready-made set
+        mqttClient.connect(connOpts);
         
         LOGGER.info("Connected to MQTT Broker: " + config.getUrl());
     } finally {
