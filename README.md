@@ -41,6 +41,7 @@ and ensureIsConnected(MqttCallback callback) method refactoring:
 
 CHANGES TO THE MqttTransportBase
 =======================
+
 1) to the connectionLost(Throwable cause) method, we add the fault accounting logic:
  @Override
   public void connectionLost(Throwable cause)
