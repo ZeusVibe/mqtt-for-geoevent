@@ -25,14 +25,14 @@ import java.util.regex.Pattern;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 
-public abstract class MqttTransportBase extends TransportBase implements MqttCallback, Runnable
+public abstract class MqttTransportBase extends TransportBase implements MqttCallback, Runnable {
 
-private volatile boolean isMonitoring = false;
-private Thread monitorThread;
-private static final long MONITOR_INTERVAL_MS = 60000; // 60 с
-private static final int RECONNECT_DELAY_MS = 60000;     // 60 с
+  private volatile boolean isMonitoring = false;
+  private Thread monitorThread;
+  private static final long MONITOR_INTERVAL_MS = 60000; // 60 с
+  private static final int RECONNECT_DELAY_MS = 60000;     // 60 с
 
-{
+
   protected static final BundleLogger LOGGER = BundleLoggerFactory.getLogger(MqttTransportBase.class.getName(), "com.esri.geoevent.transport.mqtt-transport");
   private MqttTransportConfig config;
   private MqttClientManager mqttClientManager;
@@ -395,7 +395,7 @@ private static final int RECONNECT_DELAY_MS = 60000;     // 60 с
     // return null when either property value is invalid, or null
     return null;
   }
-}
+
 
 // BACKGROUND MONITORING
 private void startConnectionMonitor() {
@@ -424,4 +424,5 @@ private void startConnectionMonitor() {
     
     monitorThread.setDaemon(true); 
     monitorThread.start();
+}
 }
