@@ -31,6 +31,10 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
+// new imports
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+
 /**
  * Manages the MQTT properties, creating clients, connecting clients, and disconnecting clients.
  */
@@ -51,25 +55,41 @@ public class MqttClientManager
       LOGGER.trace(this.toString());
   }
 
-  public void connect(MqttCallback callback) throws MqttException
-  {
-    if (config.isUseCredentials())
-      LOGGER.trace("Connecting to MQTT Broker using credentials. Username={0}", config.getUserName());
+  public void connect(MqttCallback callback) throws MqttException {
+    if (isConnected() || isConnecting.get()) return;
 
-    if (config.isUseSSL())
-      LOGGER.trace("Connecting to MQTT Broker using SSL. NOTE: Only TLS 1.0 to 1.2 are supported.");
+    try {
+        isConnecting.set(true);
+        
+        // 1. Creating a client
+        mqttClient = createMqttClient(callback);
 
-    mqttClient = createMqttClient(callback);
-    mqttClient.connect(config.getConnectOptions());
+        // 2. We configure the options (We take the basic ones from the config and add our own)
+        MqttConnectOptions connOpts = new MqttConnectOptions();
+        
+        // Your settings for the "survival" of the service after network lags
+        connOpts.setKeepAliveInterval(3600); 
+        connOpts.setConnectionTimeout(180);
+        connOpts.setAutomaticReconnect(true);
+        connOpts.setCleanSession(false); // CRITICAL for saving subscriptions
+        
+        // Data from the GeoEvent config
+        connOpts.setUserName(config.getUserName());
+        connOpts.setPassword(config.getPassword().toCharArray());
+        connOpts.setServerURIs(new String[] { config.getUrl() });
 
-    // NEW !!!
-    MqttConnectOptions connOpts = new MqttConnectOptions();
-    connOpts.setKeepAliveInterval(3600); // 1 hour is critical for long interruptions.
-    connOpts.setConnectionTimeout(180);  // 3 minutes to establish a connection
-    connOpts.setAutomaticReconnect(true);
-    connOpts.setServerURIs(Arrays.asList(config.getUrl())); // saving the URI from the config
+        if (config.isUseSSL()) {
+          LOGGER.trace("Connecting to MQTT Broker using SSL. NOTE: Only TLS 1.0 to 1.2 are supported.");
+        }
 
-  }
+        // 3. Passing the configured options to the connect method
+        mqttClient.connect(connOpts); 
+        
+        LOGGER.info("Connected to MQTT Broker: " + config.getUrl());
+    } finally {
+        isConnecting.set(false);
+    }
+}
 
   public boolean isConnected()
   {
@@ -100,27 +120,29 @@ public class MqttClientManager
 private int reconnectAttempts = 0;
 private static final int MAX_RECONNECT_ATTEMPTS = 0; // 0 = infinite reconnection
 private static final int RECONNECT_DELAY_MS = 60000; // the delay between attempts is 1 minute
+private final AtomicBoolean isConnecting = new AtomicBoolean(false);
 
-  // REDEFINED THE METHOD AND LOOK 3 STINGS ABOVE
-  public void ensureIsConnected(MqttCallback callback) throws MqttException {
-    if (!isConnected() {  //DELETED if (!isConnected() && (MAX_RECONNECT_ATTEMPTS == 0 || reconnectAttempts < MAX_RECONNECT_ATTEMPTS))
-      disconnect();
-      try {
-        Thread.sleep(RECONNECT_DELAY_MS); // pause before reconnecting
-        connect(callback);
-        reconnectAttempts = 0; // Resetting the counter on success 
-        LOGGER.info("MQTT reconnected successfully.");
-        // DELETED reconnectAttempts++;
-      } catch (InterruptedException e) {
-        LOGGER.error("Interrupted during reconnect attempt", e);
-      } catch (MqttException e) {
-      reconnectAttempts++;
-      LOGGER.warn("Reconnect failed (attempt #{0}). Will retry.", reconnectAttempts, e);
-      // продолжаем попытки — фоновый монитор вызовет снова
+// REDEFINED THE METHOD AND LOOK 4 STINGS ABOVE
+public void ensureIsConnected(MqttCallback callback) throws MqttException {
+    // Проверяем: если уже подключены ИЛИ процесс подключения запущен — выходим
+    if (!isConnected() && !isConnecting.get()) {
+        try {
+            // Just in case, we clean the old client before reconnecting.
+            disconnect(); 
+            Thread.sleep(RECONNECT_DELAY_MS);
+            connect(callback);
+            reconnectAttempts = 0; 
+            LOGGER.info("MQTT reconnected successfully.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOGGER.error("Interrupted during reconnect attempt");
+        } catch (MqttException e) {
+            reconnectAttempts++;
+            LOGGER.warn("Reconnect failed (attempt #{0}). Error: {1}", reconnectAttempts, e.getMessage());
+            throw e; // We skip above so that the monitor knows about the error.
+        }
     }
-    }
-  }
-
+}
 
 /*    OLD !!!
   public void ensureIsConnected(MqttCallback callback) throws MqttException
