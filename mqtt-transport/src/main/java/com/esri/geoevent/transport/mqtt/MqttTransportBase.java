@@ -21,6 +21,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+// new imports
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+
 public abstract class MqttTransportBase extends TransportBase implements MqttCallback, Runnable
 
 private volatile boolean isMonitoring = false;
@@ -390,24 +394,29 @@ private static final int RECONNECT_DELAY_MS = 60000;     // 60 с
 
 // BACKGROUND MONITORING
 private void startConnectionMonitor() {
-  monitorThread = new Thread(() -> {
-    while (isMonitoring) {
-      try {
-        Thread.sleep(MONITOR_INTERVAL_MS);
-        if (mqttClientManager != null && !mqttClientManager.isConnected()) {
-          LOGGER.warn("MQTT connection lost. Attempting reconnect...");
-          try {
-            mqttClientManager.ensureIsConnected(this);
-          } catch (MqttException e) {
-            LOGGER.error("Reconnect failed", e);
-          }
+    isMonitoring = true;
+    monitorThread = new Thread(() -> {
+        LOGGER.info("MQTT Connection Monitor started.");
+        while (isMonitoring && !Thread.currentThread().isInterrupted()) {
+            try {
+                Thread.sleep(MONITOR_INTERVAL_MS);
+                
+                if (mqttClientManager != null && !mqttClientManager.isConnected()) {
+                    LOGGER.warn("MQTT connection lost (monitor detected). Attempting reconnect...");
+                    try {
+                        mqttClientManager.ensureIsConnected(this);
+                    } catch (MqttException e) {
+                        LOGGER.warn("Monitor: Reconnect attempt failed: " + e.getMessage());
+                    }
+                }
+            } catch (InterruptedException e) {
+                LOGGER.info("Connection monitor thread interrupted. Closing...");
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
-      } catch (InterruptedException e) {
-        LOGGER.info("Connection monitor interrupted");
-        Thread.currentThread().interrupt();
-      }
-    }
-  });
-  monitorThread.setDaemon(true);
-  monitorThread.start();
+    }, "MQTT-Monitor-Thread");
+    
+    monitorThread.setDaemon(true); 
+    monitorThread.start();
 }
