@@ -179,8 +179,8 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
   public void connectionLost(Throwable cause)
   {
     LOGGER.debug("CONNECTION_LOST", cause, cause.getLocalizedMessage());
-    LOGGER.warn("MQTT connection lost: {}", cause.getMessage());
-    LOGGER.warn("MQTT connection lost: {}. Reconnect will be attempted by monitor.", cause.getMessage());
+    LOGGER.warn("MQTT-NEW connection lost: {}", cause.getMessage());
+    LOGGER.warn("MQTT-NEW connection lost: {}. Reconnect will be attempted by monitor.", cause.getMessage());
   }
 
   @Override
@@ -401,21 +401,21 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
 private void startConnectionMonitor() {
     isMonitoring = true;
     monitorThread = new Thread(() -> {
-        LOGGER.info("MQTT Connection Monitor started.");
+        LOGGER.info("MQTT-NEW Connection Monitor started.");
         while (isMonitoring && !Thread.currentThread().isInterrupted()) {
             try {
                 Thread.sleep(MONITOR_INTERVAL_MS);
                 
                 if (mqttClientManager != null && !mqttClientManager.isConnected()) {
-                    LOGGER.warn("MQTT connection lost (monitor detected). Attempting reconnect...");
+                    LOGGER.warn("MQTT-NEW connection lost (monitor detected). Attempting reconnect...");
                     try {
                         mqttClientManager.ensureIsConnected(this);
                     } catch (MqttException e) {
-                        LOGGER.warn("Monitor: Reconnect attempt failed: " + e.getMessage());
+                        LOGGER.warn("MQTT-NEW Monitor: Reconnect attempt failed: " + e.getMessage());
                     }
                 }
             } catch (InterruptedException e) {
-                LOGGER.info("Connection monitor thread interrupted. Closing...");
+                LOGGER.info("MQTT-NEW Connection monitor thread interrupted. Closing...");
                 Thread.currentThread().interrupt();
                 break;
             }
