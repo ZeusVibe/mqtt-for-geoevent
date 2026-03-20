@@ -83,7 +83,7 @@ public void connect(MqttCallback callback) throws MqttException {
         MqttConnectOptions connOpts = config.getConnectOptions();
         
         // 5. We ONLY modify what is responsible for stability.
-        connOpts.setKeepAliveInterval(3600); 
+        connOpts.setKeepAliveInterval(36000); 
         connOpts.setConnectionTimeout(180);
         connOpts.setAutomaticReconnect(true);
         connOpts.setCleanSession(false); 
